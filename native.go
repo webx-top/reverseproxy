@@ -107,6 +107,11 @@ func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		rw.WriteHeader(http.StatusOK)
 		rw.Write(okResponse)
 		return
+	} else if rp.ReverseProxyConfig.ResponseBefore != nil {
+		r := &NativeResponse{ResponseWriter: rw, Request: req}
+		if rp.ReverseProxyConfig.ResponseBefore(r) {
+			return
+		}
 	}
 	upgrade := req.Header.Get("Upgrade")
 	if upgrade != "" && strings.ToLower(upgrade) == "websocket" {

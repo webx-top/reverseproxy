@@ -141,6 +141,11 @@ func (rp *FastReverseProxy) handler(ctx *fasthttp.RequestCtx) {
 	if host == "__ping__" && len(uri.Path()) == 1 && uri.Path()[0] == byte('/') {
 		resp.SetBody(okResponse)
 		return
+	} else if rp.ReverseProxyConfig.ResponseBefore != nil {
+		r := &FastResponse{RequestCtx: ctx}
+		if rp.ReverseProxyConfig.ResponseBefore(r) {
+			return
+		}
 	}
 	reqData, err := rp.Router.ChooseBackend(host)
 	if err != nil {

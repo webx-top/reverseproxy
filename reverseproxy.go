@@ -34,6 +34,7 @@ type ReverseProxyConfig struct {
 	DialTimeout     time.Duration
 	RequestTimeout  time.Duration
 	RequestIDHeader string
+	ResponseBefore  func(Context) bool
 }
 
 type RequestData struct {
@@ -51,4 +52,18 @@ func (r *RequestData) String() string {
 		back = "?"
 	}
 	return r.Host + " -> " + back
+}
+
+type Context interface {
+	SetBody([]byte)
+	SetStatusCode(int)
+	Redirect(string, int)
+	SetHeader(string, string)
+	GetHeader(string) string
+	RequestURI() string
+	RequestPath() string
+	RequestMethod() string
+	RemoteAddr() string
+	QueryValue(string) string
+	QueryValues(string) []string
 }
