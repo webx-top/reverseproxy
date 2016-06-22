@@ -1,8 +1,17 @@
 package reverseproxy
 
 import (
+	"io"
 	"net/http"
 )
+
+type ResponseWrite struct {
+	*http.Response
+}
+
+func (rw *ResponseWrite) Header() http.Header {
+	return rw.Response.Header
+}
 
 var _ Context = &NativeResponse{}
 
@@ -57,4 +66,12 @@ func (n *NativeResponse) QueryValues(key string) []string {
 		return v
 	}
 	return []string{}
+}
+
+func (n *NativeResponse) RespWriter() io.Writer {
+	return n.ResponseWriter
+}
+
+func (n *NativeResponse) RequestHost() string {
+	return n.Request.Host
 }

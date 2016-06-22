@@ -107,8 +107,9 @@ func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		rw.WriteHeader(http.StatusOK)
 		rw.Write(okResponse)
 		return
-	} else if rp.ReverseProxyConfig.ResponseBefore != nil {
-		r := &NativeResponse{ResponseWriter: rw, Request: req}
+	}
+	r := &NativeResponse{ResponseWriter: rw, Request: req}
+	if rp.ReverseProxyConfig.ResponseBefore != nil {
 		if rp.ReverseProxyConfig.ResponseBefore(r) {
 			return
 		}
@@ -123,6 +124,12 @@ func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		return
 	}
 	rp.rp.ServeHTTP(rw, req)
+
+	if rp.ReverseProxyConfig.ResponseAfter != nil {
+		if rp.ReverseProxyConfig.ResponseAfter(r) {
+			return
+		}
+	}
 }
 
 func (rp *NativeReverseProxy) serveWebsocket(rw http.ResponseWriter, req *http.Request) (*RequestData, error) {

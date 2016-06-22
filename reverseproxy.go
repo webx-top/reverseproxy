@@ -5,6 +5,7 @@
 package reverseproxy
 
 import (
+	"io"
 	"time"
 
 	"github.com/webx-top/reverseproxy/log"
@@ -35,6 +36,7 @@ type ReverseProxyConfig struct {
 	RequestTimeout  time.Duration
 	RequestIDHeader string
 	ResponseBefore  func(Context) bool
+	ResponseAfter   func(Context) bool
 }
 
 type RequestData struct {
@@ -66,4 +68,6 @@ type Context interface {
 	RemoteAddr() string
 	QueryValue(string) string
 	QueryValues(string) []string
+	RespWriter() io.Writer
+	RequestHost() string
 }

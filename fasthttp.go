@@ -141,8 +141,9 @@ func (rp *FastReverseProxy) handler(ctx *fasthttp.RequestCtx) {
 	if host == "__ping__" && len(uri.Path()) == 1 && uri.Path()[0] == byte('/') {
 		resp.SetBody(okResponse)
 		return
-	} else if rp.ReverseProxyConfig.ResponseBefore != nil {
-		r := &FastResponse{RequestCtx: ctx}
+	}
+	r := &FastResponse{RequestCtx: ctx}
+	if rp.ReverseProxyConfig.ResponseBefore != nil {
 		if rp.ReverseProxyConfig.ResponseBefore(r) {
 			return
 		}
@@ -249,5 +250,10 @@ func (rp *FastReverseProxy) handler(ctx *fasthttp.RequestCtx) {
 	endErr := rp.Router.EndRequest(reqData, markAsDead, logEntry)
 	if endErr != nil {
 		log.LogError(reqData.String(), string(uri.Path()), endErr)
+	}
+	if rp.ReverseProxyConfig.ResponseAfter != nil {
+		if rp.ReverseProxyConfig.ResponseAfter(r) {
+			return
+		}
 	}
 }

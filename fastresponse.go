@@ -1,6 +1,8 @@
 package reverseproxy
 
 import (
+	"io"
+
 	"github.com/valyala/fasthttp"
 )
 
@@ -46,4 +48,12 @@ func (f *FastResponse) QueryValues(key string) []string {
 		r[k] = string(v)
 	}
 	return r
+}
+
+func (f *FastResponse) RespWriter() io.Writer {
+	return f.RequestCtx
+}
+
+func (f *FastResponse) RequestHost() string {
+	return string(f.RequestCtx.Request.Header.Host())
 }
