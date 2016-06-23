@@ -5,14 +5,6 @@ import (
 	"net/http"
 )
 
-type ResponseWrite struct {
-	*http.Response
-}
-
-func (rw *ResponseWrite) Header() http.Header {
-	return rw.Response.Header
-}
-
 var _ Context = &NativeResponse{}
 
 type NativeResponse struct {
