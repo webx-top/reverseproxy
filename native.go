@@ -108,7 +108,7 @@ func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		rw.Write(okResponse)
 		return
 	}
-	r := &NativeResponse{ResponseWriter: rw, Request: req}
+	r := &NativeResponse{RespWriter: rw, Request: req}
 	if rp.ReverseProxyConfig.ResponseBefore != nil {
 		if rp.ReverseProxyConfig.ResponseBefore(r) {
 			return

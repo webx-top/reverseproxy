@@ -50,7 +50,7 @@ func (f *FastResponse) QueryValues(key string) []string {
 	return r
 }
 
-func (f *FastResponse) RespWriter() io.Writer {
+func (f *FastResponse) ResponseWriter() io.Writer {
 	return f.RequestCtx
 }
 

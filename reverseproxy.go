@@ -68,6 +68,6 @@ type Context interface {
 	RemoteAddr() string
 	QueryValue(string) string
 	QueryValues(string) []string
-	RespWriter() io.Writer
+	ResponseWriter() io.Writer
 	RequestHost() string
 }
