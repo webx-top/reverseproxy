@@ -34,10 +34,23 @@ var (
 type NativeReverseProxy struct {
 	http.Transport
 	ReverseProxyConfig
-	server   *manners.GracefulServer
-	rp       *httputil.ReverseProxy
-	dialer   *net.Dialer
-	listener net.Listener
+	server             *manners.GracefulServer
+	rp                 *httputil.ReverseProxy
+	dialer             *net.Dialer
+	listener           net.Listener
+	PassingBrowsingURL bool
+}
+
+func singleJoiningSlash(a, b string) string {
+	aslash := strings.HasSuffix(a, "/")
+	bslash := strings.HasPrefix(b, "/")
+	switch {
+	case aslash && bslash:
+		return a + b[1:]
+	case !aslash && !bslash:
+		return a + "/" + b
+	}
+	return a + b
 }
 
 type fixedReadCloser struct {
@@ -90,6 +103,12 @@ func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, e
 		Transport:     rp,
 		FlushInterval: rp.FlushInterval,
 		BufferPool:    &bufferPool{},
+	}
+	if rp.PassingBrowsingURL {
+		rp.rp.Director = func(req *http.Request) {
+			rp.direct(req)
+		}
+		rp.rp.Transport = nil
 	}
 	return rp.listener.Addr().String(), nil
 }
@@ -177,7 +196,7 @@ func (rp *NativeReverseProxy) serveWebsocket(rw http.ResponseWriter, req *http.R
 	return reqData, nil
 }
 
-func (rp *NativeReverseProxy) RoundTrip(req *http.Request) (*http.Response, error) {
+func (rp *NativeReverseProxy) direct(req *http.Request) *RequestData {
 	reqData, err := rp.Router.ChooseBackend(req.Host)
 	if err != nil {
 		log.LogError(reqData.String(), req.URL.Path, err)
@@ -195,6 +214,20 @@ func (rp *NativeReverseProxy) RoundTrip(req *http.Request) (*http.Response, erro
 		req.URL.Scheme = "http"
 		req.URL.Host = reqData.Backend
 	}
+	/*
+		req.URL.Path = singleJoiningSlash(u.Path, req.URL.Path)
+		if u.RawQuery == "" || req.URL.RawQuery == "" {
+			req.URL.RawQuery = u.RawQuery + req.URL.RawQuery
+		} else {
+			req.URL.RawQuery = u.RawQuery + "&" + req.URL.RawQuery
+		}
+	*/
+	//fmt.Printf(`%#v`, req.URL)
+	return reqData
+}
+
+func (rp *NativeReverseProxy) RoundTrip(req *http.Request) (*http.Response, error) {
+	reqData := rp.direct(req)
 	if rp.RequestIDHeader != "" && req.Header.Get(rp.RequestIDHeader) == "" {
 		unparsedID, err := uuid.NewV4()
 		if err == nil {

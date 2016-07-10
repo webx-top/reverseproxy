@@ -23,11 +23,12 @@ import (
 
 type FastReverseProxy struct {
 	ReverseProxyConfig
-	listener  net.Listener
-	server    *fasthttp.Server
-	dialFunc  func(addr string) (net.Conn, error)
-	mu        sync.Mutex
-	clientMap map[string]*fasthttp.HostClient
+	listener           net.Listener
+	server             *fasthttp.Server
+	dialFunc           func(addr string) (net.Conn, error)
+	mu                 sync.Mutex
+	clientMap          map[string]*fasthttp.HostClient
+	PassingBrowsingURL bool
 }
 
 func dialWithTimeout(t time.Duration) func(string) (net.Conn, error) {
@@ -102,7 +103,9 @@ func (rp *FastReverseProxy) debugHeaders(rsp *fasthttp.Response, reqData *Reques
 func (rp *FastReverseProxy) serveWebsocket(dstHost string, reqData *RequestData, ctx *fasthttp.RequestCtx) {
 	req := &ctx.Request
 	uri := req.URI()
-	uri.SetHost(dstHost)
+	if !rp.PassingBrowsingURL {
+		uri.SetHost(dstHost)
+	}
 	dstConn, err := rp.dialFunc(dstHost)
 	if err != nil {
 		log.LogError(reqData.String(), string(uri.Path()), err)
@@ -221,7 +224,10 @@ func (rp *FastReverseProxy) handler(ctx *fasthttp.RequestCtx) {
 	if !isIP {
 		req.Header.SetBytesV("X-Host", uri.Host())
 		req.Header.SetBytesV("X-Forwarded-Host", uri.Host())
-		uri.SetHost(hostOnly)
+
+		if !rp.PassingBrowsingURL {
+			uri.SetHost(hostOnly)
+		}
 	}
 	client := rp.getClient(dstHost, dstScheme == "https")
 	t0 := time.Now().UTC()
