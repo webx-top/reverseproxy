@@ -86,14 +86,6 @@ func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, e
 	var err error
 	rp.ReverseProxyConfig = rpConfig
 
-	if !rpConfig.DisabledAloneService {
-		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
-		if err != nil {
-			return "", err
-		}
-		rp.server = manners.NewWithServer(&http.Server{Handler: rp})
-	}
-
 	rp.dialer = &net.Dialer{
 		Timeout:   rp.DialTimeout,
 		KeepAlive: 30 * time.Second,
@@ -115,7 +107,16 @@ func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, e
 		}
 		rp.rp.Transport = nil
 	}
-	return rp.listener.Addr().String(), nil
+
+	if !rpConfig.DisabledAloneService {
+		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
+		if err != nil {
+			return "", err
+		}
+		rp.server = manners.NewWithServer(&http.Server{Handler: rp})
+		return rp.listener.Addr().String(), nil
+	}
+	return "", err
 }
 
 func (rp *NativeReverseProxy) Listen() {

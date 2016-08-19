@@ -40,6 +40,8 @@ func dialWithTimeout(t time.Duration) func(string) (net.Conn, error) {
 
 func (rp *FastReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, error) {
 	rp.ReverseProxyConfig = rpConfig
+	rp.dialFunc = dialWithTimeout(rp.DialTimeout)
+	rp.clientMap = make(map[string]*fasthttp.HostClient)
 	var err error
 	if !rpConfig.DisabledAloneService {
 		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
@@ -49,10 +51,9 @@ func (rp *FastReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, err
 		rp.server = &fasthttp.Server{
 			Handler: rp.Handler,
 		}
+		return rp.listener.Addr().String(), nil
 	}
-	rp.dialFunc = dialWithTimeout(rp.DialTimeout)
-	rp.clientMap = make(map[string]*fasthttp.HostClient)
-	return rp.listener.Addr().String(), nil
+	return "", err
 }
 
 func (rp *FastReverseProxy) Listen() {
@@ -181,7 +182,7 @@ func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 		dstHost = reqData.Backend
 	}
 	upgrade := req.Header.Peek("Upgrade")
-	if len(upgrade) > 0 && bytes.Compare(bytes.ToLower(upgrade), websocketUpgrade) == 0 {
+	if len(upgrade) > 0 && bytes.Equal(bytes.ToLower(upgrade), websocketUpgrade) {
 		resp.SkipResponse = true
 		rp.serveWebsocket(dstHost, reqData, ctx)
 		return
