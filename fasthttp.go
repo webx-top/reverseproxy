@@ -18,6 +18,7 @@ import (
 
 	"github.com/nu7hatch/gouuid"
 	"github.com/valyala/fasthttp"
+	"github.com/webx-top/echo/engine"
 	"github.com/webx-top/reverseproxy/log"
 )
 
@@ -40,12 +41,14 @@ func dialWithTimeout(t time.Duration) func(string) (net.Conn, error) {
 func (rp *FastReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, error) {
 	rp.ReverseProxyConfig = rpConfig
 	var err error
-	rp.listener, err = net.Listen("tcp", rpConfig.Listen)
-	if err != nil {
-		return "", err
-	}
-	rp.server = &fasthttp.Server{
-		Handler: rp.handler,
+	if !rpConfig.DisabledAloneService {
+		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
+		if err != nil {
+			return "", err
+		}
+		rp.server = &fasthttp.Server{
+			Handler: rp.Handler,
+		}
 	}
 	rp.dialFunc = dialWithTimeout(rp.DialTimeout)
 	rp.clientMap = make(map[string]*fasthttp.HostClient)
@@ -53,11 +56,21 @@ func (rp *FastReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, err
 }
 
 func (rp *FastReverseProxy) Listen() {
+	if rp.ReverseProxyConfig.DisabledAloneService {
+		return
+	}
 	rp.server.Serve(rp.listener)
 }
 
 func (rp *FastReverseProxy) Stop() {
+	if rp.ReverseProxyConfig.DisabledAloneService {
+		return
+	}
 	rp.listener.Close()
+}
+
+func (rp *FastReverseProxy) HandlerForEcho(resp engine.Response, req engine.Request) {
+	rp.Handler(resp.Object().(*fasthttp.RequestCtx))
 }
 
 func (rp *FastReverseProxy) getClient(addr string, tls bool) *fasthttp.HostClient {
@@ -136,7 +149,7 @@ func (rp *FastReverseProxy) serveWebsocket(dstHost string, reqData *RequestData,
 	})
 }
 
-func (rp *FastReverseProxy) handler(ctx *fasthttp.RequestCtx) {
+func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 	req := &ctx.Request
 	resp := &ctx.Response
 	host := string(req.Header.Host())

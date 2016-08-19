@@ -20,6 +20,7 @@ import (
 
 	"github.com/admpub/manners"
 	"github.com/nu7hatch/gouuid"
+	"github.com/webx-top/echo/engine"
 	"github.com/webx-top/reverseproxy/log"
 )
 
@@ -84,11 +85,15 @@ func (p *bufferPool) Put(b []byte) {
 func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, error) {
 	var err error
 	rp.ReverseProxyConfig = rpConfig
-	rp.listener, err = net.Listen("tcp", rpConfig.Listen)
-	if err != nil {
-		return "", err
+
+	if !rpConfig.DisabledAloneService {
+		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
+		if err != nil {
+			return "", err
+		}
+		rp.server = manners.NewWithServer(&http.Server{Handler: rp})
 	}
-	rp.server = manners.NewWithServer(&http.Server{Handler: rp})
+
 	rp.dialer = &net.Dialer{
 		Timeout:   rp.DialTimeout,
 		KeepAlive: 30 * time.Second,
@@ -114,11 +119,21 @@ func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, e
 }
 
 func (rp *NativeReverseProxy) Listen() {
+	if rp.ReverseProxyConfig.DisabledAloneService {
+		return
+	}
 	rp.server.Serve(rp.listener)
 }
 
 func (rp *NativeReverseProxy) Stop() {
+	if rp.ReverseProxyConfig.DisabledAloneService {
+		return
+	}
 	rp.server.Close()
+}
+
+func (rp *NativeReverseProxy) HandlerForEcho(resp engine.Response, req engine.Request) {
+	rp.ServeHTTP(resp.Object().(http.ResponseWriter), req.Object().(*http.Request))
 }
 
 func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
