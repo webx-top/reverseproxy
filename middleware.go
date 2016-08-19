@@ -24,9 +24,20 @@ type ProxyOptions struct {
 	RequestIDHeader string
 	ResponseBefore  func(Context) bool
 	ResponseAfter   func(Context) bool
+	router          *ProxyRouter
+}
+
+func (p *ProxyOptions) AddHost(hosts ...string) {
+	if p.router == nil {
+		p.router = NewProxyRouter(p.Hosts...)
+	}
+	if len(hosts) > 0 {
+		p.router.AddHost(hosts...)
+	}
 }
 
 func Proxy(options *ProxyOptions) echo.MiddlewareFunc {
+	options.AddHost()
 	config := &ReverseProxyConfig{
 		FlushInterval:        options.FlushInterval,
 		DialTimeout:          options.DialTimeout,
@@ -35,7 +46,7 @@ func Proxy(options *ProxyOptions) echo.MiddlewareFunc {
 		ResponseBefore:       options.ResponseBefore,
 		ResponseAfter:        options.ResponseAfter,
 		DisabledAloneService: true,
-		Router:               NewProxyRouter(options.Hosts...),
+		Router:               options.router,
 	}
 	config.DisabledAloneService = true
 	var rPxy ReverseProxy
@@ -55,6 +66,11 @@ func Proxy(options *ProxyOptions) echo.MiddlewareFunc {
 		return echo.HandlerFunc(func(c echo.Context) error {
 			urlPath := c.Request().URL().Path()
 			if len(urlPath) > prefixLength && urlPath[0:prefixLength] == options.PathPrefix {
+				/*
+					if options.router.hostNum < 1 {
+						return ErrAllBackendsDead
+					}
+				*/
 				rPxy.HandlerForEcho(c.Response(), c.Request())
 				return nil
 			}
@@ -99,12 +115,15 @@ func (r *ProxyRouter) AddHost(hosts ...string) *ProxyRouter {
 	return r
 }
 
-func (r *ProxyRouter) ChooseBackend(host string) (*RequestData, error) {
+func (r *ProxyRouter) ChooseBackend(host string) (rd *RequestData, err error) {
 	if r.hostNum < 1 {
-		return nil, ErrNoBackends
+		err = ErrNoBackends
+		r.onlineHosts = r.offlineHosts
+		r.offlineHosts = []string{}
+		r.hostNum = len(r.onlineHosts)
 	}
 	r.resultHost = host
-	rd := &RequestData{
+	rd = &RequestData{
 		Backend:    r.dst,
 		BackendIdx: 0,
 		BackendKey: host,
@@ -119,7 +138,7 @@ func (r *ProxyRouter) ChooseBackend(host string) (*RequestData, error) {
 	rd.BackendIdx = idx
 	rd.BackendKey = r.onlineHosts[idx]
 	rd.Backend = `http://` + r.onlineHosts[idx]
-	return rd, nil
+	return
 }
 
 func (r *ProxyRouter) EndRequest(reqData *RequestData, isDead bool, fn func() *LogEntry) error {
