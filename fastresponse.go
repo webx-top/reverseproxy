@@ -3,7 +3,7 @@ package reverseproxy
 import (
 	"io"
 
-	"github.com/valyala/fasthttp"
+	"github.com/admpub/fasthttp"
 )
 
 var _ Context = &FastResponse{}

@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/admpub/fasthttp"
 	"github.com/nu7hatch/gouuid"
-	"github.com/valyala/fasthttp"
 	"github.com/webx-top/echo/engine"
 	"github.com/webx-top/reverseproxy/log"
 )
@@ -71,7 +71,7 @@ func (rp *FastReverseProxy) Stop() {
 }
 
 func (rp *FastReverseProxy) HandlerForEcho(resp engine.Response, req engine.Request) {
-	rp.Handler(resp.Object().(*fasthttp.RequestCtx))
+	rp.Handler(req.Object().(*fasthttp.RequestCtx))
 }
 
 func (rp *FastReverseProxy) getClient(addr string, tls bool) *fasthttp.HostClient {

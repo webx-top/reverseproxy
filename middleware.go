@@ -11,6 +11,9 @@ import (
 	. "github.com/webx-top/reverseproxy/log"
 )
 
+var ErrNoBackends = errors.New("no backends")
+var ErrAllBackendsDead = errors.New("all backends are dead")
+
 type ProxyOptions struct {
 	PathPrefix      string   //网址路径前缀，符合这个前缀的将反向代理到其它服务器
 	Engine          string   //反向代理使用的引擎，值为fast时使用fastHTTP，否则使用标准HTTP
@@ -98,7 +101,7 @@ func (r *ProxyRouter) AddHost(hosts ...string) *ProxyRouter {
 
 func (r *ProxyRouter) ChooseBackend(host string) (*RequestData, error) {
 	if r.hostNum < 1 {
-		return nil, errors.New(`ReverseProxy Backend Host is empty.`)
+		return nil, ErrNoBackends
 	}
 	r.resultHost = host
 	rd := &RequestData{
