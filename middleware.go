@@ -24,6 +24,7 @@ type ProxyOptions struct {
 	RequestIDHeader string
 	ResponseBefore  func(Context) bool
 	ResponseAfter   func(Context) bool
+	Preprocessor    func(echo.Context) error
 	router          *ProxyRouter
 }
 
@@ -71,6 +72,11 @@ func Proxy(options *ProxyOptions) echo.MiddlewareFunc {
 						return ErrAllBackendsDead
 					}
 				*/
+				if options.Preprocessor != nil {
+					if err := options.Preprocessor(c); err != nil {
+						return err
+					}
+				}
 				rPxy.HandlerForEcho(c.Response(), c.Request())
 				return nil
 			}
