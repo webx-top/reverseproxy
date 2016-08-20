@@ -121,6 +121,41 @@ func (r *ProxyRouter) AddHost(hosts ...string) *ProxyRouter {
 	return r
 }
 
+func (r *ProxyRouter) DelHost(hosts ...string) *ProxyRouter {
+	for _, host := range hosts {
+		for idx, offlineHost := range r.offlineHosts {
+			if offlineHost == host {
+				r.offlineHosts = append(r.offlineHosts[0:idx], r.offlineHosts[idx+1:]...)
+			}
+		}
+		for idx, onlineHost := range r.onlineHosts {
+			if onlineHost == host {
+				r.onlineHosts = append(r.onlineHosts[0:idx], r.onlineHosts[idx+1:]...)
+			}
+		}
+	}
+	r.hostNum = len(r.onlineHosts)
+	return r
+}
+
+func (r *ProxyRouter) Offline(hosts ...string) *ProxyRouter {
+	for _, host := range hosts {
+		onlineIdx := -1
+		for idx, onlineHost := range r.onlineHosts {
+			if onlineHost == host {
+				onlineIdx = idx
+				break
+			}
+		}
+		if onlineIdx > -1 {
+			r.offlineHosts = append(r.offlineHosts, r.onlineHosts[onlineIdx])
+			r.onlineHosts = append(r.onlineHosts[0:onlineIdx], r.onlineHosts[onlineIdx+1:]...)
+		}
+	}
+	r.hostNum = len(r.onlineHosts)
+	return r
+}
+
 func (r *ProxyRouter) ChooseBackend(host string) (rd *RequestData, err error) {
 	if r.hostNum < 1 {
 		err = ErrNoBackends
