@@ -125,7 +125,8 @@ func (rp *FastReverseProxy) serveWebsocket(dstHost string, reqData *RequestData,
 		log.LogError(reqData.String(), string(uri.Path()), err)
 		return
 	}
-	if clientIP, _, err := net.SplitHostPort(ctx.RemoteAddr().String()); err == nil {
+	var clientIP string
+	if clientIP, _, err = net.SplitHostPort(ctx.RemoteAddr().String()); err == nil {
 		if prior := string(req.Header.Peek("X-Forwarded-For")); len(prior) > 0 {
 			clientIP = prior + ", " + clientIP
 		}
@@ -150,6 +151,10 @@ func (rp *FastReverseProxy) serveWebsocket(dstHost string, reqData *RequestData,
 	})
 }
 
+func (rp *FastReverseProxy) ridString(req *fasthttp.Request) string {
+	return rp.RequestIDHeader + ":" + string(req.Header.Peek(rp.RequestIDHeader))
+}
+
 func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 	req := &ctx.Request
 	resp := &ctx.Response
@@ -165,9 +170,16 @@ func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 			return
 		}
 	}
+	if rp.RequestIDHeader != "" && len(req.Header.Peek(rp.RequestIDHeader)) == 0 {
+		var unparsedID *uuid.UUID
+		unparsedID, err := uuid.NewV4()
+		if err == nil {
+			req.Header.Set(rp.RequestIDHeader, unparsedID.String())
+		}
+	}
 	reqData, err := rp.Router.ChooseBackend(host)
 	if err != nil {
-		log.LogError(reqData.String(), string(uri.Path()), err)
+		reqData.logError(string(uri.Path()), rp.ridString(req), err)
 	}
 	dstScheme := ""
 	dstHost := ""
@@ -176,7 +188,7 @@ func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 		dstScheme = u.Scheme
 		dstHost = u.Host
 	} else {
-		log.LogError(reqData.String(), string(uri.Path()), err)
+		reqData.logError(string(uri.Path()), rp.ridString(req), err)
 	}
 	if dstHost == "" {
 		dstHost = reqData.Backend
@@ -212,23 +224,27 @@ func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 	}
 	isDebug := len(req.Header.Peek("X-Debug-Router")) > 0
 	req.Header.Del("X-Debug-Router")
-	if dstHost == "" {
-		resp.SetStatusCode(http.StatusBadRequest)
-		resp.SetBody(noRouteResponseContent)
+	if err != nil || dstHost == "" {
+		if err != nil {
+			reqData.logError(string(uri.Path()), rp.ridString(req), err)
+		}
+		var status int
+		var body []byte
+		switch err {
+		case nil, ErrNoRegisteredBackends:
+			status = http.StatusBadRequest
+			body = noRouteResponseContent
+		default:
+			status = http.StatusServiceUnavailable
+		}
+		resp.SetStatusCode(status)
+		resp.SetBody(body)
 		rp.debugHeaders(resp, reqData, isDebug)
 		endErr := rp.Router.EndRequest(reqData, false, logEntry)
 		if endErr != nil {
-			log.LogError(reqData.String(), string(uri.Path()), endErr)
+			reqData.logError(string(uri.Path()), rp.ridString(req), endErr)
 		}
 		return
-	}
-	if rp.RequestIDHeader != "" && len(req.Header.Peek(rp.RequestIDHeader)) == 0 {
-		unparsedID, err := uuid.NewV4()
-		if err == nil {
-			req.Header.Set(rp.RequestIDHeader, unparsedID.String())
-		} else {
-			log.LogError(reqData.String(), string(uri.Path()), fmt.Errorf("unable to generate request id: %s", err))
-		}
 	}
 	hostOnly, _, _ := net.SplitHostPort(dstHost)
 	if hostOnly == "" {
@@ -264,12 +280,12 @@ func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 			err = fmt.Errorf("%s *DEAD*", err)
 		}
 		resp.SetStatusCode(http.StatusServiceUnavailable)
-		log.LogError(reqData.String(), string(uri.Path()), err)
+		reqData.logError(string(uri.Path()), rp.ridString(req), err)
 	}
 	rp.debugHeaders(resp, reqData, isDebug)
 	endErr := rp.Router.EndRequest(reqData, markAsDead, logEntry)
 	if endErr != nil {
-		log.LogError(reqData.String(), string(uri.Path()), endErr)
+		reqData.logError(string(uri.Path()), rp.ridString(req), endErr)
 	}
 	if rp.ReverseProxyConfig.ResponseAfter != nil {
 		if rp.ReverseProxyConfig.ResponseAfter(r) {

@@ -1,7 +1,6 @@
 package reverseproxy
 
 import (
-	"errors"
 	"math/rand"
 	"strings"
 	"time"
@@ -10,9 +9,6 @@ import (
 	"github.com/webx-top/echo"
 	. "github.com/webx-top/reverseproxy/log"
 )
-
-var ErrNoBackends = errors.New("no backends")
-var ErrAllBackendsDead = errors.New("all backends are dead")
 
 type ProxyOptions struct {
 	PathPrefix      string   //网址路径前缀，符合这个前缀的将反向代理到其它服务器

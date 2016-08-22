@@ -6,7 +6,12 @@ package log
 
 import (
 	"log"
+	"os"
 	"time"
+)
+
+var (
+	ErrorLogger = log.New(os.Stderr, "", log.LstdFlags)
 )
 
 type LogEntry struct {
@@ -27,5 +32,5 @@ type LogEntry struct {
 }
 
 func LogError(location string, path string, err error) {
-	log.Print("ERROR in ", location, " - ", path, " - ", err.Error())
+	ErrorLogger.Print("ERROR in ", location, " - ", path, " - ", err.Error())
 }

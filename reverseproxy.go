@@ -5,6 +5,7 @@
 package reverseproxy
 
 import (
+	"errors"
 	"io"
 	"time"
 
@@ -16,6 +17,10 @@ var (
 	noRouteResponseContent = []byte("no such route")
 	okResponse             = []byte("OK")
 	websocketUpgrade       = []byte("websocket")
+
+	ErrAllBackendsDead      = errors.New("all backends are dead")
+	ErrNoRegisteredBackends = errors.New("no backends registered for host")
+	ErrNoBackends           = errors.New("no backends")
 )
 
 type Router interface {
@@ -57,6 +62,10 @@ func (r *RequestData) String() string {
 		back = "?"
 	}
 	return r.Host + " -> " + back
+}
+
+func (r *RequestData) logError(path string, rid string, err error) {
+	log.ErrorLogger.Print("ERROR in ", r.String(), " - ", path, " - ", rid, " - ", err.Error())
 }
 
 type Context interface {

@@ -137,6 +137,10 @@ func (rp *NativeReverseProxy) HandlerForEcho(resp engine.Response, req engine.Re
 	rp.ServeHTTP(resp.Object().(http.ResponseWriter), req.Object().(*http.Request))
 }
 
+func (rp *NativeReverseProxy) ridString(req *http.Request) string {
+	return rp.RequestIDHeader + ":" + req.Header.Get(rp.RequestIDHeader)
+}
+
 func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.Host == "__ping__" && req.URL.Path == "/" {
 		rw.WriteHeader(http.StatusOK)
@@ -149,11 +153,17 @@ func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 			return
 		}
 	}
+	if rp.RequestIDHeader != "" && req.Header.Get(rp.RequestIDHeader) == "" {
+		unparsedID, err := uuid.NewV4()
+		if err == nil {
+			req.Header.Set(rp.RequestIDHeader, unparsedID.String())
+		}
+	}
 	upgrade := req.Header.Get("Upgrade")
 	if upgrade != "" && strings.ToLower(upgrade) == "websocket" {
 		reqData, err := rp.serveWebsocket(rw, req)
 		if err != nil {
-			log.LogError(reqData.String(), req.URL.Path, err)
+			reqData.logError(req.URL.Path, rp.ridString(req), err)
 			http.Error(rw, "", http.StatusBadGateway)
 		}
 		return
@@ -191,7 +201,8 @@ func (rp *NativeReverseProxy) serveWebsocket(rw http.ResponseWriter, req *http.R
 		return reqData, err
 	}
 	defer conn.Close()
-	if clientIP, _, err := net.SplitHostPort(req.RemoteAddr); err == nil {
+	var clientIP string
+	if clientIP, _, err = net.SplitHostPort(req.RemoteAddr); err == nil {
 		if prior, ok := req.Header["X-Forwarded-For"]; ok {
 			clientIP = strings.Join(prior, ", ") + ", " + clientIP
 		}
@@ -243,16 +254,23 @@ func (rp *NativeReverseProxy) direct(req *http.Request) *RequestData {
 }
 
 func (rp *NativeReverseProxy) RoundTrip(req *http.Request) (*http.Response, error) {
-	reqData := rp.direct(req)
-	if rp.RequestIDHeader != "" && req.Header.Get(rp.RequestIDHeader) == "" {
-		unparsedID, err := uuid.NewV4()
-		if err == nil {
-			req.Header.Set(rp.RequestIDHeader, unparsedID.String())
-		} else {
-			log.LogError(reqData.String(), req.URL.Path, fmt.Errorf("unable to generate request id: %s", err))
-		}
+	req.URL.Scheme = ""
+	req.URL.Host = ""
+	reqData, err := rp.Router.ChooseBackend(req.Host)
+	if err != nil {
+		reqData.logError(req.URL.Path, rp.ridString(req), err)
+		return rp.roundTripWithData(req, reqData, err), nil
 	}
-	rsp := rp.roundTripWithData(req, reqData)
+	u, err := url.Parse(reqData.Backend)
+	if err == nil {
+		req.URL.Host = u.Host
+		req.URL.Scheme = u.Scheme
+	}
+	if req.URL.Host == "" {
+		req.URL.Scheme = "http"
+		req.URL.Host = reqData.Backend
+	}
+	rsp := rp.roundTripWithData(req, reqData, nil)
 	return rsp, nil
 }
 
@@ -265,9 +283,7 @@ func (rp *NativeReverseProxy) debugHeaders(rsp *http.Response, reqData *RequestD
 	rsp.Header.Set("X-Debug-Frontend-Key", reqData.Host)
 }
 
-func (rp *NativeReverseProxy) roundTripWithData(req *http.Request, reqData *RequestData) *http.Response {
-	var rsp *http.Response
-	var backendDuration time.Duration
+func (rp *NativeReverseProxy) doResponse(req *http.Request, reqData *RequestData, rsp *http.Response, isDebug bool, isDead bool, backendDuration time.Duration) *http.Response {
 	logEntry := func() *log.LogEntry {
 		return &log.LogEntry{
 			Now:             time.Now(),
@@ -286,25 +302,40 @@ func (rp *NativeReverseProxy) roundTripWithData(req *http.Request, reqData *Requ
 			ContentLength:   rsp.ContentLength,
 		}
 	}
-	var err error
+	rsp.Request = req
+	rsp.ProtoMajor = req.ProtoMajor
+	rsp.ProtoMinor = req.ProtoMinor
+	rsp.Header = http.Header{}
+	if isDebug {
+		rsp.Header.Set("X-Debug-Backend-Url", reqData.Backend)
+		rsp.Header.Set("X-Debug-Backend-Id", strconv.FormatUint(uint64(reqData.BackendIdx), 10))
+		rsp.Header.Set("X-Debug-Frontend-Key", reqData.Host)
+	}
+	err := rp.Router.EndRequest(reqData, isDead, logEntry)
+	if err != nil {
+		reqData.logError(req.URL.Path, rp.ridString(req), err)
+	}
+	return rsp
+}
+
+func (rp *NativeReverseProxy) roundTripWithData(req *http.Request, reqData *RequestData, err error) (rsp *http.Response) {
 	isDebug := req.Header.Get("X-Debug-Router") != ""
 	req.Header.Del("X-Debug-Router")
-	if req.URL.Scheme == "" || req.URL.Host == "" {
-		rsp = &http.Response{
-			Request:       req,
-			StatusCode:    http.StatusBadRequest,
-			ProtoMajor:    req.ProtoMajor,
-			ProtoMinor:    req.ProtoMinor,
-			ContentLength: int64(len(noRouteResponseBody.value)),
-			Header:        http.Header{},
-			Body:          noRouteResponseBody,
+	if err != nil || req.URL.Scheme == "" || req.URL.Host == "" {
+		switch err {
+		case nil, ErrNoRegisteredBackends:
+			rsp = &http.Response{
+				StatusCode:    http.StatusBadRequest,
+				ContentLength: int64(len(noRouteResponseBody.value)),
+				Body:          noRouteResponseBody,
+			}
+		default:
+			rsp = &http.Response{
+				StatusCode: http.StatusServiceUnavailable,
+				Body:       emptyResponseBody,
+			}
 		}
-		rp.debugHeaders(rsp, reqData, isDebug)
-		err = rp.Router.EndRequest(reqData, false, logEntry)
-		if err != nil {
-			log.LogError(reqData.String(), req.URL.Path, err)
-		}
-		return rsp
+		return rp.doResponse(req, reqData, rsp, isDebug, false, 0)
 	}
 	var timedout int32
 	if rp.RequestTimeout > 0 {
@@ -326,36 +357,32 @@ func (rp *NativeReverseProxy) roundTripWithData(req *http.Request, reqData *Requ
 	}
 	t0 := time.Now().UTC()
 	rsp, err = rp.Transport.RoundTrip(req)
-	backendDuration = time.Since(t0)
+	backendDuration := time.Since(t0)
 	markAsDead := false
 	if err != nil {
+		var dialTimeout, requestTimeout bool
 		if netErr, ok := err.(net.Error); ok {
 			markAsDead = !netErr.Temporary()
+			dialTimeout = netErr.Timeout()
 		}
-		isTimeout := atomic.LoadInt32(&timedout) == int32(1)
-		if isTimeout {
+		requestTimeout = atomic.LoadInt32(&timedout) == int32(1)
+		if requestTimeout {
 			markAsDead = false
-			err = fmt.Errorf("request timed out after %v: %s", time.Since(reqData.StartTime), err)
+			err = fmt.Errorf("request timeout after %v: %s", time.Since(reqData.StartTime), err)
+		} else if dialTimeout {
+			markAsDead = true
+			err = fmt.Errorf("dial timeout after %v: %s", time.Since(reqData.StartTime), err)
 		} else {
 			err = fmt.Errorf("error in backend request: %s", err)
 		}
 		if markAsDead {
 			err = fmt.Errorf("%s *DEAD*", err)
 		}
-		log.LogError(reqData.String(), req.URL.Path, err)
+		reqData.logError(req.URL.Path, rp.ridString(req), err)
 		rsp = &http.Response{
-			Request:    req,
 			StatusCode: http.StatusServiceUnavailable,
-			ProtoMajor: req.ProtoMajor,
-			ProtoMinor: req.ProtoMinor,
-			Header:     http.Header{},
 			Body:       emptyResponseBody,
 		}
 	}
-	rp.debugHeaders(rsp, reqData, isDebug)
-	endErr := rp.Router.EndRequest(reqData, markAsDead, logEntry)
-	if endErr != nil {
-		log.LogError(reqData.String(), req.URL.Path, endErr)
-	}
-	return rsp
+	return rp.doResponse(req, reqData, rsp, isDebug, markAsDead, backendDuration)
 }
