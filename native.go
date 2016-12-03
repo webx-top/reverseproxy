@@ -186,7 +186,9 @@ func (rp *NativeReverseProxy) serveWebsocket(rw http.ResponseWriter, req *http.R
 	if err != nil {
 		return reqData, err
 	}
-	req.Host = url.Host
+	if !rp.PassingBrowsingURL {
+		req.Host = url.Host
+	}
 	dstConn, err := rp.dialer.Dial("tcp", url.Host)
 	if err != nil {
 		return reqData, err
