@@ -278,6 +278,7 @@ func (rp *FastReverseProxy) Handler(ctx *fasthttp.RequestCtx) {
 		}
 		if markAsDead {
 			err = fmt.Errorf("%s *DEAD*", err)
+			r.SetDead(true)
 		}
 		resp.SetStatusCode(http.StatusServiceUnavailable)
 		reqData.logError(string(uri.Path()), rp.ridString(req), err)

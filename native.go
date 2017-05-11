@@ -5,6 +5,7 @@
 package reverseproxy
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -168,7 +169,11 @@ func (rp *NativeReverseProxy) ServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		return
 	}
+
 	rp.rp.ServeHTTP(rw, req)
+	if isDead, ok := req.Context().Value(`isDead`).(bool); ok {
+		r.SetDead(isDead)
+	}
 
 	if rp.ReverseProxyConfig.ResponseAfter != nil {
 		if rp.ReverseProxyConfig.ResponseAfter(r) {
@@ -317,6 +322,7 @@ func (rp *NativeReverseProxy) doResponse(req *http.Request, reqData *RequestData
 	if err != nil {
 		reqData.logError(req.URL.Path, rp.ridString(req), err)
 	}
+	req.WithContext(context.WithValue(req.Context(), `isDead`, isDead))
 	return rsp
 }
 

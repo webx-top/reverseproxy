@@ -82,4 +82,6 @@ type Context interface {
 	QueryValues(string) []string
 	ResponseWriter() io.Writer
 	RequestHost() string
+	IsDead() bool
+	SetDead(bool)
 }

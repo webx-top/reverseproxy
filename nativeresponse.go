@@ -10,6 +10,7 @@ var _ Context = &NativeResponse{}
 type NativeResponse struct {
 	RespWriter http.ResponseWriter
 	*http.Request
+	isDead bool
 }
 
 func (n *NativeResponse) SetBody(body []byte) {
@@ -66,4 +67,12 @@ func (n *NativeResponse) ResponseWriter() io.Writer {
 
 func (n *NativeResponse) RequestHost() string {
 	return n.Request.Host
+}
+
+func (n *NativeResponse) IsDead() bool {
+	return n.isDead
+}
+
+func (n *NativeResponse) SetDead(on bool) {
+	n.isDead = on
 }

@@ -10,6 +10,7 @@ var _ Context = &FastResponse{}
 
 type FastResponse struct {
 	*fasthttp.RequestCtx
+	isDead bool
 }
 
 func (f *FastResponse) SetHeader(key string, value string) {
@@ -56,4 +57,12 @@ func (f *FastResponse) ResponseWriter() io.Writer {
 
 func (f *FastResponse) RequestHost() string {
 	return string(f.RequestCtx.Request.Header.Host())
+}
+
+func (f *FastResponse) IsDead() bool {
+	return f.isDead
+}
+
+func (f *FastResponse) SetDead(on bool) {
+	f.isDead = on
 }
