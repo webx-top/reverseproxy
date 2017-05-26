@@ -7,6 +7,7 @@ package reverseproxy
 import (
 	"errors"
 	"io"
+	"net"
 	"time"
 
 	"github.com/webx-top/echo/engine"
@@ -29,8 +30,8 @@ type Router interface {
 }
 
 type ReverseProxy interface {
-	Initialize(rpConfig ReverseProxyConfig) (string, error)
-	Listen()
+	Initialize(rpConfig ReverseProxyConfig) error
+	Listen(...net.Listener)
 	Stop()
 	HandlerForEcho(engine.Response, engine.Request)
 }
@@ -41,6 +42,10 @@ type ReverseProxyConfig struct {
 	FlushInterval        time.Duration
 	DialTimeout          time.Duration
 	RequestTimeout       time.Duration
+	ReadTimeout          time.Duration
+	ReadHeaderTimeout    time.Duration
+	WriteTimeout         time.Duration
+	IdleTimeout          time.Duration
 	RequestIDHeader      string
 	ResponseBefore       func(Context) bool
 	ResponseAfter        func(Context) bool

@@ -12,16 +12,16 @@ func main() {
 	e := echo.New()
 	e.Use(mw.Log())
 	proxyOptions := &reverseproxy.ProxyOptions{
-		Hosts:      []string{"localhost:8080"},
-		PathPrefix: "/api/",
-		Engine:     "fast",
+		Hosts:  []string{"https://localhost:8080/admin/"},
+		Prefix: "/admin/",
+		Engine: "fast",
 	}
 	e.Use(reverseproxy.Proxy(proxyOptions))
 	e.Get("/", echo.HandlerFunc(func(c echo.Context) error {
-		return c.String(200, "Hello, World!")
+		return c.String("Hello, World!")
 	}))
 	e.Get("/v2", echo.HandlerFunc(func(c echo.Context) error {
-		return c.String(200, "Echo v2")
+		return c.String("Echo v2")
 	}))
 	switch "fast" {
 	case "fast":

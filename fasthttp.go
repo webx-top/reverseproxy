@@ -38,27 +38,28 @@ func dialWithTimeout(t time.Duration) func(string) (net.Conn, error) {
 	}
 }
 
-func (rp *FastReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, error) {
+func (rp *FastReverseProxy) Initialize(rpConfig ReverseProxyConfig) error {
 	rp.ReverseProxyConfig = rpConfig
 	rp.dialFunc = dialWithTimeout(rp.DialTimeout)
 	rp.clientMap = make(map[string]*fasthttp.HostClient)
-	var err error
-	if !rpConfig.DisabledAloneService {
-		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
-		if err != nil {
-			return "", err
-		}
-		rp.server = &fasthttp.Server{
-			Handler: rp.Handler,
-		}
-		return rp.listener.Addr().String(), nil
+	rp.server = &fasthttp.Server{
+		Handler: rp.Handler,
 	}
-	return "", err
+	return nil
 }
 
-func (rp *FastReverseProxy) Listen() {
+func (rp *FastReverseProxy) Listen(listener ...net.Listener) {
 	if rp.ReverseProxyConfig.DisabledAloneService {
 		return
+	}
+	if len(listener) > 0 {
+		rp.listener = listener[0]
+	} else if rp.listener == nil {
+		var err error
+		rp.listener, err = net.Listen("tcp", rp.ReverseProxyConfig.Listen)
+		if err != nil {
+			panic(err)
+		}
 	}
 	rp.server.Serve(rp.listener)
 }

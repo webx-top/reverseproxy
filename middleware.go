@@ -11,7 +11,7 @@ import (
 )
 
 type ProxyOptions struct {
-	PathPrefix      string   //网址路径前缀，符合这个前缀的将反向代理到其它服务器
+	Prefix          string   //网址路径前缀，符合这个前缀的将反向代理到其它服务器
 	Engine          string   //反向代理使用的引擎，值为fast时使用fastHTTP，否则使用标准HTTP
 	Hosts           []string //支持通过反向代理访问的后台服务器集群，例如 192.168.0.2:8080
 	FlushInterval   time.Duration
@@ -54,15 +54,15 @@ func Proxy(options *ProxyOptions) echo.MiddlewareFunc {
 		rPxy = &NativeReverseProxy{PassingBrowsingURL: true}
 		options.Engine = `Standard`
 	}
-	_, err := rPxy.Initialize(*config)
+	err := rPxy.Initialize(*config)
 	if err != nil {
 		panic(err.Error())
 	}
-	prefixLength := len(options.PathPrefix)
+	prefixLength := len(options.Prefix)
 	return func(h echo.Handler) echo.Handler {
 		return echo.HandlerFunc(func(c echo.Context) error {
 			urlPath := c.Request().URL().Path()
-			if len(urlPath) > prefixLength && urlPath[0:prefixLength] == options.PathPrefix {
+			if len(urlPath) > prefixLength && urlPath[0:prefixLength] == options.Prefix {
 				/*
 					if options.router.hostNum < 1 {
 						return ErrAllBackendsDead
@@ -174,7 +174,11 @@ func (r *ProxyRouter) ChooseBackend(host string) (rd *RequestData, err error) {
 	}
 	rd.BackendIdx = idx
 	rd.BackendKey = r.onlineHosts[idx]
-	rd.Backend = `http://` + r.onlineHosts[idx]
+	if len(rd.BackendKey) > 8 && (rd.BackendKey[0:8] == `https://` || rd.BackendKey[0:7] == `http://`) {
+		rd.Backend = rd.BackendKey
+	} else {
+		rd.Backend = `http://` + rd.BackendKey
+	}
 	return
 }
 

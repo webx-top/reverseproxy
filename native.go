@@ -34,9 +34,10 @@ var (
 )
 
 type NativeReverseProxy struct {
+	ConnState func(c net.Conn, s http.ConnState)
 	http.Transport
 	ReverseProxyConfig
-	server             *manners.GracefulServer
+	servers            []*manners.GracefulServer
 	rp                 *httputil.ReverseProxy
 	dialer             *net.Dialer
 	listener           net.Listener
@@ -83,9 +84,9 @@ func (p *bufferPool) Put(b []byte) {
 	p.syncPool.Put(b)
 }
 
-func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, error) {
-	var err error
+func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) error {
 	rp.ReverseProxyConfig = rpConfig
+	rp.servers = make([]*manners.GracefulServer, 0)
 
 	rp.dialer = &net.Dialer{
 		Timeout:   rp.DialTimeout,
@@ -109,29 +110,42 @@ func (rp *NativeReverseProxy) Initialize(rpConfig ReverseProxyConfig) (string, e
 		rp.rp.Transport = nil
 	}
 
-	if !rpConfig.DisabledAloneService {
-		rp.listener, err = net.Listen("tcp", rpConfig.Listen)
-		if err != nil {
-			return "", err
-		}
-		rp.server = manners.NewWithServer(&http.Server{Handler: rp})
-		return rp.listener.Addr().String(), nil
-	}
-	return "", err
+	return nil
 }
 
-func (rp *NativeReverseProxy) Listen() {
+func (rp *NativeReverseProxy) Listen(listener ...net.Listener) {
 	if rp.ReverseProxyConfig.DisabledAloneService {
 		return
 	}
-	rp.server.Serve(rp.listener)
+	if len(listener) > 0 {
+		rp.listener = listener[0]
+	} else if rp.listener == nil {
+		var err error
+		rp.listener, err = net.Listen("tcp", rp.ReverseProxyConfig.Listen)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	server := manners.NewWithServer(&http.Server{
+		ReadTimeout:       rp.ReverseProxyConfig.ReadTimeout,
+		ReadHeaderTimeout: rp.ReverseProxyConfig.ReadHeaderTimeout,
+		WriteTimeout:      rp.ReverseProxyConfig.WriteTimeout,
+		IdleTimeout:       rp.ReverseProxyConfig.IdleTimeout,
+		Handler:           rp,
+		ConnState:         rp.ConnState,
+	})
+	rp.servers = append(rp.servers, server)
+	server.Serve(rp.listener)
 }
 
 func (rp *NativeReverseProxy) Stop() {
 	if rp.ReverseProxyConfig.DisabledAloneService {
 		return
 	}
-	rp.server.Close()
+	for _, server := range rp.servers {
+		server.Close()
+	}
 }
 
 func (rp *NativeReverseProxy) HandlerForEcho(resp engine.Response, req engine.Request) {
