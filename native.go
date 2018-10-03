@@ -122,7 +122,9 @@ func (rp *NativeReverseProxy) Listen(listener ...net.Listener) error {
 	} else if rp.listener == nil {
 		var err error
 		rp.listener, err = net.Listen("tcp", rp.ReverseProxyConfig.Listen)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	server := manners.NewWithServer(&http.Server{

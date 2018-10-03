@@ -57,7 +57,9 @@ func (rp *FastReverseProxy) Listen(listener ...net.Listener) error {
 	} else if rp.listener == nil {
 		var err error
 		rp.listener, err = net.Listen("tcp", rp.ReverseProxyConfig.Listen)
-		return err
+		if err != nil {
+			return err
+		}
 	}
 	return rp.server.Serve(rp.listener)
 }
