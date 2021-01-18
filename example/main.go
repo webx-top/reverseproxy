@@ -12,7 +12,7 @@ func main() {
 	e := echo.New()
 	e.Use(mw.Log())
 	proxyOptions := &reverseproxy.ProxyOptions{
-		Hosts:  []string{"https://localhost:8080/admin/"},
+		Hosts:  []string{"http://127.0.0.1:8084/"},
 		Prefix: "/admin/",
 		Engine: "fast",
 	}
@@ -23,8 +23,8 @@ func main() {
 	e.Get("/v2", echo.HandlerFunc(func(c echo.Context) error {
 		return c.String("Echo v2")
 	}))
-	switch "fast" {
-	case "fast":
+	switch proxyOptions.Engine {
+	case "FastHTTP", "fast":
 		// FastHTTP
 		e.Run(fasthttp.New(":4444"))
 	default:
