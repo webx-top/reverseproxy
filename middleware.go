@@ -62,12 +62,7 @@ func Proxy(options *ProxyOptions) echo.MiddlewareFunc {
 	return func(h echo.Handler) echo.Handler {
 		return echo.HandlerFunc(func(c echo.Context) error {
 			urlPath := c.Request().URL().Path()
-			if len(urlPath) > prefixLength && urlPath[0:prefixLength] == options.Prefix {
-				/*
-					if options.router.hostNum < 1 {
-						return ErrAllBackendsDead
-					}
-				*/
+			if len(urlPath) >= prefixLength && urlPath[0:prefixLength] == options.Prefix {
 				if options.Preprocessor != nil {
 					if err := options.Preprocessor(c); err != nil {
 						return err
