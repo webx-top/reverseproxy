@@ -23,7 +23,7 @@ require (
 	github.com/stretchr/testify v1.7.0 // indirect
 	github.com/webx-top/captcha v0.0.0-20161202061115-29e9e7f30aa0 // indirect
 	github.com/webx-top/com v0.0.7 // indirect
-	github.com/webx-top/echo v2.6.0+incompatible
+	github.com/webx-top/echo v2.7.0+incompatible
 	github.com/webx-top/tagfast v0.0.0-20161020041435-9a2065ce3dd2 // indirect
 	github.com/webx-top/validation v0.0.1 // indirect
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777

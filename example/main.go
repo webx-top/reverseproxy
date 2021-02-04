@@ -14,10 +14,24 @@ func main() {
 	e.Use(mw.Log())
 	proxyOptions := &reverseproxy.ProxyOptions{
 		Hosts:  []string{"http://127.0.0.1:9999"},
-		Prefix: "/",
 		Engine: "fast",
+		Rewrite: mw.RewriteConfig{
+			Rules: map[string]string{
+				`/api/*`: `/api/v1/$1`,
+			},
+		},
 	}
-	e.Use(reverseproxy.Proxy(proxyOptions))
+
+	//!方式1:
+	//proxyOptions.Prefix = "/api"
+	//e.Use(reverseproxy.Proxy(proxyOptions))
+
+	//!方式2:
+	g := e.Group(`/api`)
+	g.Any(`/*`, func(c echo.Context) error {
+		return echo.ErrNotFound
+	}, reverseproxy.Proxy(proxyOptions))
+
 	e.Get("/", echo.HandlerFunc(func(c echo.Context) error {
 		return c.String("Hello, World!")
 	}))
@@ -26,10 +40,10 @@ func main() {
 	}))
 
 	c := &engine.Config{
-		Address:     ":8084",
-		TLSAuto:     false,
-		TLSCertFile: "192.168.15.105.pem",
-		TLSKeyFile:  "192.168.15.105-key.pem",
+		Address: ":8084",
+		TLSAuto: false,
+		//TLSCertFile: "192.168.15.105.pem",
+		//TLSKeyFile:  "192.168.15.105-key.pem",
 	}
 	switch proxyOptions.Engine {
 	case "FastHTTP", "fast":

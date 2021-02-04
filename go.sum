@@ -158,8 +158,8 @@ github.com/webx-top/captcha v0.0.0-20161202061115-29e9e7f30aa0 h1:KkrDcd2yO7QHeJ
 github.com/webx-top/captcha v0.0.0-20161202061115-29e9e7f30aa0/go.mod h1:DLtQXR6uR8UMcKb7dB5eYgsDHG0WPI74rM/B/JFGxfE=
 github.com/webx-top/com v0.0.7 h1:IDJvI6uBDnYVrC3zUcomVwXEvYjZiFfcllETQ3ckivQ=
 github.com/webx-top/com v0.0.7/go.mod h1:DDfATzu1w5+vD5XmG3YRTfLjaIqZWi/yeJ7HQEGsM2Q=
-github.com/webx-top/echo v2.6.0+incompatible h1:bSnPLD1HrKPdVPyioS6bJgdOuP6DgAI8qSSprh5hlAE=
-github.com/webx-top/echo v2.6.0+incompatible/go.mod h1:ufVP//GwP1suggBSQW7l8G9XcKxZM+FIfCMElLAQqF8=
+github.com/webx-top/echo v2.7.0+incompatible h1:Lbr4v5/6+6ucxXA+Wpa1LNyJ4DJ9nIQc9DilxruSq0Q=
+github.com/webx-top/echo v2.7.0+incompatible/go.mod h1:ufVP//GwP1suggBSQW7l8G9XcKxZM+FIfCMElLAQqF8=
 github.com/webx-top/tagfast v0.0.0-20161020041435-9a2065ce3dd2 h1:lqnGa1BnWT7pN+c9V31bik0lTp5XxyOMRp7ICsZ6K5M=
 github.com/webx-top/tagfast v0.0.0-20161020041435-9a2065ce3dd2/go.mod h1:pMe3sJitHxbxX2EAI/v9HEAXjodP4c+yUVw3rbKcljI=
 github.com/webx-top/validation v0.0.1 h1:I7d5iCsEY8CRzvqCJbUnIZ3Yz0MyLvInVoaljUdn21c=
